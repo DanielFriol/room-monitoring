@@ -9,16 +9,36 @@ Description: >
 Globals:
   Function:
     Timeout: 3
+Parameters:
+  AwsRoomMonitoringCognitoUserPoolId:
+    Type: String
 
 Resources:
+  ApiCognitoAuthorizer:          
+  Type: AWS::ApiGateway::Authorizer
+  Properties:
+    IdentitySource: 'method.request.header.authorization'
+    Name: ApiCognitoAuthorizer
+    ProviderARNs:
+      - 'arn:aws:cognito-idp:us-east-1:{AwsRoomMonitoringCognitoUserPoolId}'
+    RestApiId: !Ref ServerlessRestApi
+    Type: COGNITO_USER_POOLS
+
+    OAuth2Authorizer:
+      AuthorizationScopes:
+        - !Ref ApiCognitoAuthorizer
+      JwtConfiguration:
+        issuer: "https://www.example.com/v1/connect/oauth2"
+        audience:
+          - MyApi
+      IdentitySource: "$request.header.authorization"
+
   AuthFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
       CodeUri: hello-world/functions/auth
       Handler: app.handler
       Runtime: nodejs16.x
-      Architectures:
-        - x86_64
       Events:
         Auth:
           Type: HttpApi # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
@@ -39,8 +59,8 @@ Resources:
       CodeUri: hello-world/functions/register-data
       Handler: app.handler
       Runtime: nodejs16.x
-      Architectures:
-        - x86_64
+      Auth:
+        Authorizer: !Ref ApiCognitoAuthorizer
       Events:
         Auth:
           Type: HttpApi # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
@@ -56,16 +76,34 @@ Resources:
         EntryPoints: 
         - app.ts
 
+  MonitoringRoomSingleTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: monitoring-room-single-table
+      AttributeDefinitions:
+      - AttributeName: PK
+        AttributeType: S
+      - AttibuteName: SK
+        AttributeType: S
+      KeySchema:
+      - AttributeName: PK
+        KeyType: HASH
+      - AttributeName: SK
+        KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5 
+
 Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
   # Find out more about other implicit resources you can reference within SAM
   # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldApi:
+  RoomMonitoringApi:
     Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/v1/"
+  RoomMonitoringFunctionIamRole:
     Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+    Value: !GetAtt RoomMonitoringFunctionRole.Arn
+  MonitoringRoomSingleTable:
+    Description: Table Created using this template.
+    Value: !Ref MonitoringRoomSingleTable
