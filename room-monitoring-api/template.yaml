@@ -12,26 +12,49 @@ Globals:
 Parameters:
   AwsRoomMonitoringCognitoUserPoolId:
     Type: String
+  AwsRoomMonitoringCognitoClientId:
+    Type: String
 
 Resources:
-  ApiCognitoAuthorizer:          
-  Type: AWS::ApiGateway::Authorizer
-  Properties:
-    IdentitySource: 'method.request.header.authorization'
-    Name: ApiCognitoAuthorizer
-    ProviderARNs:
-      - 'arn:aws:cognito-idp:us-east-1:{AwsRoomMonitoringCognitoUserPoolId}'
-    RestApiId: !Ref ServerlessRestApi
-    Type: COGNITO_USER_POOLS
 
-    OAuth2Authorizer:
-      AuthorizationScopes:
-        - !Ref ApiCognitoAuthorizer
-      JwtConfiguration:
-        issuer: "https://www.example.com/v1/connect/oauth2"
-        audience:
-          - MyApi
-      IdentitySource: "$request.header.authorization"
+  CognitoAdminPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      Description: Policy to allow access to cognito idp
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Action:
+              - "cognito-idp:AdminInitiateAuth"
+            Resource: !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/${AwsRoomMonitoringCognitoUserPoolId}"
+            Effect: Allow
+
+  HttpApi:
+  Properties:
+    Auth:
+    DefaultAuthorizer: RoomMonitoringAuthorizer
+    Authorizers:
+      RoomMonitoringAuthorizer:
+        IdentitySource: $request.header.authorization
+        JwtConfiguration:
+          audience:
+            - !Ref AwsRoomMonitoringCognitoClientId
+          issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${AwsRoomMonitoringCognitoUserPoolId}"
+    CorsConfiguration:
+      AllowMethods:
+        - "*"
+      AllowHeaders:
+        - "*"
+      AllowOrigins:
+        - "*"
+    DefinitionBody:
+      info:
+        version: "1.0"
+        title: !Ref AWS::StackName
+      paths: {}
+      openapi: 3.0.1
+    StageName: "v1"
+
 
   AuthFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
@@ -40,41 +63,45 @@ Resources:
       Handler: app.handler
       Runtime: nodejs16.x
       Events:
-        Auth:
+        PostAuth:
           Type: HttpApi # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
+            ApiId: !Ref HttpApi
             Path: /auth
             Method: POST
-    Metadata: # Manage esbuild properties
-      BuildMethod: esbuild
-      BuildProperties:
-        Minify: true
-        Target: "es2020"
-        Sourcemap: true
-        EntryPoints: 
-        - app.ts
+      Policies:
+        - !Ref CognitoAdminPolicy
+  AuthFunctionLogGroup:
+    Type: AWS::Logs:LogGroup
+    DependsOn: [ AuthFunction ]
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AuthFunction}
+      RetentionsInDay: !FindInMap [StageMapping, "dev", CloudWatchRetention]
+
   RegisterDataFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
       CodeUri: hello-world/functions/register-data
       Handler: app.handler
       Runtime: nodejs16.x
-      Auth:
-        Authorizer: !Ref ApiCognitoAuthorizer
       Events:
-        Auth:
+        PostRegisterData:
           Type: HttpApi # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
           Properties:
+            ApiId: !Ref HttpApi
             Path: /register
             Method: POST
-    Metadata: # Manage esbuild properties
-      BuildMethod: esbuild
-      BuildProperties:
-        Minify: true
-        Target: "es2020"
-        Sourcemap: true
-        EntryPoints: 
-        - app.ts
+            Auth:
+              Authorizer: RoomMonitoringAuthorizer
+      Policies:
+        - DynamoDBCrudPolicy:
+          TableName: !Ref MonitoringRoomSingleTable
+  RegisterDataFunctionLogGroup:
+    Type: AWS::Logs:LogGroup
+    DependsOn: [ RegisterDataFunction ]
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${RegisterDataFunction}
+      RetentionsInDay: !FindInMap [StageMapping, "dev", CloudWatchRetention]
 
   MonitoringRoomSingleTable:
     Type: AWS::DynamoDB::Table
@@ -95,15 +122,6 @@ Resources:
         WriteCapacityUnits: 5 
 
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
   RoomMonitoringApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/v1/"
-  RoomMonitoringFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt RoomMonitoringFunctionRole.Arn
-  MonitoringRoomSingleTable:
-    Description: Table Created using this template.
-    Value: !Ref MonitoringRoomSingleTable
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}/v1/"
