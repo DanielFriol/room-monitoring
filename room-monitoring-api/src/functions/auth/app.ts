@@ -6,11 +6,13 @@ const client = fabricateCognitoIdpClient();
 const CLIENT_ID = process.env.COGNITO_CLIENT_ID;
 const USER_POOL_ID = process.env.COGNITO_USER_POOL_ID;
 
+type AuthenticationRequestModel = {
+    username: string
+    password: string
+}
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
-    const body = JSON.parse(event.body ?? "");
-    const username = body.username;
-    const password = body.password;
+    const body: AuthenticationRequestModel = JSON.parse(event.body ?? "");
     let response: APIGatewayProxyResult;
     try {
         const args: AdminInitiateAuthCommandInput = {
@@ -18,8 +20,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             ClientId: CLIENT_ID,
             UserPoolId: USER_POOL_ID,
             AuthParameters: {
-                "USERNAME": username,
-                "PASSWORD": password
+                "USERNAME": body.username,
+                "PASSWORD": body.password
             }
         }
         const adminResponse = await client.adminInitiateAuth(args);

@@ -59,7 +59,7 @@ Resources:
   AuthFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: hello-world/functions/auth
+      CodeUri: src/functions/auth
       Handler: app.handler
       Runtime: nodejs16.x
       Events:
@@ -81,7 +81,7 @@ Resources:
   RegisterDataFunction:
     Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
     Properties:
-      CodeUri: hello-world/functions/register-data
+      CodeUri: src/functions/register-data
       Handler: app.handler
       Runtime: nodejs16.x
       Events:
