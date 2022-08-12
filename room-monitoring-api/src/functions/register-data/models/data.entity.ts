@@ -6,8 +6,8 @@ export class DeviceData {
 
     toDdbData() {
         return {
-            PK: "DATA#DEVICE#NAME" + this.deviceName,
-            SK: "DATA#CREATED#AT" + this.createdAt,
+            PK: "DATA#DEVICE#NAME#" + this.deviceName,
+            SK: "DATA#CREATED#AT#" + this.createdAt,
             temperature: this.temperature,
             humidity: this.humidity,
             deviceName: this.deviceName,

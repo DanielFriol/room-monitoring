@@ -14,7 +14,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         response = {
             statusCode: 200,
             body: JSON.stringify({
-                data: ddbResponse,
+                ...ddbResponse,
             }),
         };
     } catch (error) {

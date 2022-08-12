@@ -15,7 +15,10 @@ export default class RegisterDataService {
             .deviceName(data.deviceName)
             .build();
         const inputData = this._dataCreateInput(deviceData);
-        await this._client.transactWrite(inputData);
+        await this._client.transactWrite(inputData).promise().catch((error) => {
+            console.log(error);
+            return error;
+        });
         return deviceData;
     }
 

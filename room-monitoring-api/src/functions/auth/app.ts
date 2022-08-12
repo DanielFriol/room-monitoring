@@ -20,8 +20,8 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
             ClientId: CLIENT_ID,
             UserPoolId: USER_POOL_ID,
             AuthParameters: {
-                "USERNAME": body.username,
-                "PASSWORD": body.password
+                USERNAME: body.username,
+                PASSWORD: body.password,
             }
         }
         const adminResponse = await client.adminInitiateAuth(args);
